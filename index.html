@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1b4442">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>FastBrain</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%231b4442'/%3E%3Cpath d='M13.2 4.8 7.6 13h4l-1 6.2L16.4 11h-4z' fill='%23f0b44c'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div id="app"></div>
+  <noscript>FastBrain needs JavaScript turned on.</noscript>
+
+  <script src="js/util.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/data/words.js"></script>
+  <script src="js/games/nback.js"></script>
+  <script src="js/games/cwm.js"></script>
+  <script src="js/games/mmath.js"></script>
+  <script src="js/games/corsi.js"></script>
+  <script src="js/games/span.js"></script>
+  <script src="js/games/pasat.js"></script>
+  <script src="js/pages.js"></script>
+  <script>
+    FB.speech.init();
+    FB.buildShell();
+    window.addEventListener('hashchange', FB.navigate);
+    FB.navigate();
+    // offline support when served over http(s); opening index.html as a file still works without it
+    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+      navigator.serviceWorker.register('sw.js').catch(e => console.warn('Offline mode unavailable', e));
+    }
+  </script>
+</body>
+</html>
