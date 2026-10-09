@@ -175,7 +175,7 @@ body:not(.in-game) .game-main { flex: 1 1 auto; max-width: none; }
 .result-card .rc-level { margin: 12px 0 6px; font-weight: 600; }
 .result-card .rc-level.up { color: var(--teal-bright); }
 .result-card .rc-level.down { color: var(--gold); }
-.result-card .rc-details { font-size: 14px; color: var(--text-soft); margin-top: 10px; }
+.result-card .rc-details { font-size: 14px; color: var(--text-soft); margin-top: 10px; overflow-wrap: anywhere; word-break: break-word; }
 .result-card .rc-details div { padding: 2px 0; }
 .result-card .rc-next { font-size: 13px; color: var(--muted); margin-top: 16px; }
 
@@ -194,7 +194,8 @@ body:not(.in-game) .game-main { flex: 1 1 auto; max-width: none; }
 .qs-all svg { width: 14px; height: 14px; }
 
 .today-sets { font-size: 12.5px; margin-top: 8px; }
-.today-sets .ts-row { display: grid; grid-template-columns: 22px 1fr 44px 46px 66px; gap: 4px; padding: 2px 0; }
+.today-sets .ts-row { display: grid; grid-template-columns: 20px minmax(0, 1fr) 36px 38px 52px; gap: 4px; padding: 2px 0; }
+.today-sets .ts-row span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .today-sets .ts-row.good { color: var(--teal); }
 .today-sets .ts-row.bad { color: #ff6b5b; }
 .today-sets .ts-row.mid { color: var(--text); }
@@ -226,6 +227,7 @@ body:not(.in-game) .game-main { flex: 1 1 auto; max-width: none; }
 .sf-select { width: auto; min-width: 140px; padding: 0 8px; }
 .sf-select option { background: #333; }
 .sf-num-wrap { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+.sf-suffix { display: inline-block; min-width: 28px; }
 .sf-range { width: 100%; accent-color: var(--teal-bright); }
 .sf-switch { position: relative; width: 38px; height: 22px; flex: 0 0 38px; cursor: pointer; }
 .sf-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
@@ -470,7 +472,7 @@ body:not(.in-game) .game-main { flex: 1 1 auto; max-width: none; }
 .prog-card h3 small { font-weight: 400; color: var(--muted); font-size: 12px; }
 .prog-card .kpis { display: flex; gap: 22px; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
 .prog-card .kpis b { display: block; font-size: 17px; color: var(--text); }
-.chart { width: 100%; height: 150px; display: block; }
+.chart { width: 100%; height: auto; display: block; }
 .chart .axis { stroke: rgba(255,255,255,.15); }
 .chart .lvl { fill: none; stroke: var(--teal-bright); stroke-width: 2; }
 .chart .scr { fill: none; stroke: var(--gold); stroke-width: 1.5; stroke-dasharray: 3 3; opacity: .85; }
@@ -560,3 +562,30 @@ body.in-game input { -webkit-user-select: text; user-select: text; }
 .nback-buttons, .nback-button, .nback-grid { touch-action: none; }
 .nback-button { -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
 .nback-button:focus { outline: none; }
+
+/* ---------- QA fixes ---------- */
+/* phone menu: dim the page behind it; tapping the dimmed area closes the menu */
+.menu-scrim { display: none; }
+@media (max-width: 991px) {
+  body.menu-open .menu-scrim { display: block; position: fixed; inset: 52px 0 0 0; background: rgba(0,0,0,.45); z-index: 30; }
+}
+/* long mental-math problems wrap inside a card that grows instead of spilling out */
+.mmath-view-field { height: auto; min-height: 62px; padding: 8px 16px; text-align: center; overflow-wrap: anywhere; line-height: 1.25; }
+/* bigger checkboxes for fingers */
+@media (pointer: coarse) {
+  .type-grid input { width: 22px; height: 22px; }
+  .type-grid label { padding: 6px 0; font-size: 17px; }
+}
+/* history table on phones: compact, no wrapping, set label column hidden */
+.history-table td { white-space: nowrap; }
+@media (max-width: 600px) {
+  .history-table { font-size: 12px; }
+  .history-table th, .history-table td { padding: 5px 4px; }
+  .history-table .col-set { display: none; }
+}
+
+/* exercise column may shrink below its content width (stops sideways scroll at ~1000 px) */
+.game-main { min-width: 0; }
+/* N-Back without a speech voice: the letter is shown here instead of spoken */
+.nback-fallback { text-align: center; min-height: 0; font-size: 22px; font-weight: 700; color: var(--gold); letter-spacing: .1em; }
+.nback-fallback:not(:empty) { margin-top: 8px; }

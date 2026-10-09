@@ -181,7 +181,7 @@
           const add = L => {
             if (picked.length >= items.length) return;
             picked.push(L); draw();
-            if (picked.length === items.length) setTimeout(res, 250);
+            if (picked.length === items.length) setTimeout(() => { if (picked.length === items.length) res(); }, 250);
           };
           LETTERS.forEach(L => grid.append(h('div', { on: { click: () => add(L) } }, L)));
           box.append(grid, slots);
@@ -214,7 +214,7 @@
           const add = i => {
             if (picked.length >= items.length) return;
             picked.push(i); draw();
-            if (picked.length === items.length) setTimeout(res, 250);
+            if (picked.length === items.length) setTimeout(() => { if (picked.length === items.length) res(); }, 250);
           };
           for (let i = 0; i < 16; i++) { const c = h('div', { on: { click: () => add(i) } }); cells.push(c); grid.append(c); }
           box.append(grid, slots);
@@ -250,7 +250,7 @@
         },
         cancel() { onYesNo = null; onRecallKey = null; },
         key(e) {
-          if (e.repeat) return;
+          if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
           if (onRecallKey) { onRecallKey(e); return; }
           if (!onYesNo) return;
           const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;

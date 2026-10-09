@@ -105,6 +105,11 @@
     mount(area, ctx) {
       let view, input, nextBtn, status, timeEl, submitFn = null;
 
+      // long problems (high levels) get a smaller font so they stay readable in the card
+      function showProblem(text) {
+        view.textContent = text;
+        view.style.fontSize = text.length > 26 ? '18px' : text.length > 18 ? '21px' : '';
+      }
       function draw() {
         area.innerHTML = '';
         view = h('div.mmath-view-field');
@@ -115,7 +120,7 @@
         area.append(h('div.mmath-area.play-area', view,
           h('div.mmath-response', input, h('span.input-icon.ok', { html: FB.icons.check }), h('span.input-icon.err', { html: FB.icons.err })),
           h('div.mmath-next-wrap', nextBtn), status,
-          FB.keypad(input, () => submitFn && submitFn(), ['.', '-'])));
+          FB.keypad(input, () => submitFn && submitFn())));
         input.addEventListener('keydown', e => {
           if (e.key === 'Enter') { e.preventDefault(); submitFn && submitFn(); }
         });
@@ -136,7 +141,7 @@
           for (let i = 0; i < total; i++) {
             ctx.setCounter((i + 1) + ' of ' + total);
             const p = makeProblem(type, level);
-            view.textContent = p.text;
+            showProblem(p.text);
             input.value = ''; input.disabled = false; input.className = 'result-input';
             status.textContent = '';
             nextBtn.disabled = false;
@@ -163,7 +168,7 @@
             if (ok) { correct++; answeredMs += ms; }
             input.disabled = true;
             nextBtn.disabled = true;
-            view.textContent = p.text;
+            showProblem(p.text);
             input.classList.add(ok ? 'is-valid' : 'is-invalid');
             if (val === undefined) input.value = '';
             status.innerHTML = ok ? '<span class="ok">Correct: ' + p.answer + '</span>' : 'Correct: ' + p.answer + (val === undefined ? ' <span style="color:#f0b44c">(time is up)</span>' : '');

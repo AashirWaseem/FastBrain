@@ -11,16 +11,30 @@
   const isReverse = t => t === 'reverse' || t === 'stickyReverse';
   const isSticky = t => t === 'sticky' || t === 'stickyReverse';
 
-  function layout(n, size, block) {
+  // Random, never-overlapping block positions. Blocks shrink a little when many
+  // have to fit on a small (phone) board; if random placement can't fit them,
+  // fall back to one block per cell of a jittered grid, which can't overlap.
+  function layout(n, size) {
+    const pad = 12, inner = size - 2 * pad;
+    const cols = Math.ceil(Math.sqrt(n * 1.6));
+    const cell = inner / cols;
+    const block = Math.max(26, Math.min(50, Math.floor(cell * 0.82)));
+    const max = size - block - pad;
+    const minDist = block * 1.5;  // > block × √2, so squares can never touch
     const pts = [];
-    const pad = 14, max = size - block - pad;
-    let minDist = block * 1.55;
-    for (let tries = 0; pts.length < n; tries++) {
-      if (tries > 4000) { minDist *= 0.9; tries = 0; }
+    for (let tries = 0; pts.length < n && tries < 4000; tries++) {
       const p = { x: FB.randInt(pad, max), y: FB.randInt(pad, max) };
       if (pts.every(q => Math.hypot(q.x - p.x, q.y - p.y) >= minDist)) pts.push(p);
     }
-    return pts;
+    if (pts.length < n) {
+      pts.length = 0;
+      const cells = FB.shuffle(Array.from({ length: cols * cols }, (_, i) => i)).slice(0, n);
+      cells.forEach(c => pts.push({
+        x: Math.round(pad + (c % cols) * cell + Math.random() * Math.max(0, cell - block)),
+        y: Math.round(pad + Math.floor(c / cols) * cell + Math.random() * Math.max(0, cell - block))
+      }));
+    }
+    return { pts, block };
   }
 
   const game = {
@@ -80,8 +94,8 @@
         area.append(h('div.prompt-line', text || ''), board);
       }
       const prompt = t => { area.querySelector('.prompt-line').textContent = t; };
-      const block = (p) => {
-        const b = h('div.corsi-block', { style: { left: p.x + 'px', top: p.y + 'px' } });
+      const block = (p, size) => {
+        const b = h('div.corsi-block', { style: { left: p.x + 'px', top: p.y + 'px', width: (size || 50) + 'px', height: (size || 50) + 'px' } });
         board.append(b);
         return b;
       };
@@ -105,12 +119,12 @@
             board.classList.remove('recall');
             prompt('Remember the order of the blocks as they appear');
             const size = board.clientWidth || 480;
-            const pts = layout(L, size, 50);
+            const { pts, block: bsize } = layout(L, size);
             // blocks join the board one per step and all stay visible
             const blocks = [];
             for (let i = 0; i < L; i++) {
               await clock.wait(T);
-              const b = block(pts[i]);
+              const b = block(pts[i], bsize);
               if (s.sounds) FB.sound.tick(vol());
               blocks.push(b);
             }

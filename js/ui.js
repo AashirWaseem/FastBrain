@@ -69,13 +69,15 @@
             change: e => {
               let v = parseFloat(e.target.value);
               if (isNaN(v)) v = settings[spec.key];
+              const st = spec.step || 1;
+              v = Math.round(Math.round(v / st) * st * 1e6) / 1e6;
               if (spec.min != null) v = Math.max(spec.min, v);
               if (spec.max != null) v = Math.min(spec.max, v);
               e.target.value = v; set(v);
             }
           }
         });
-        return h('div.sf', h('div.sf-row', h('div.sf-head', spec.label), h('div.sf-num-wrap', inp, spec.suffix || '')), helpEl);
+        return h('div.sf', h('div.sf-row', h('div.sf-head', spec.label), h('div.sf-num-wrap', inp, h('span.sf-suffix', spec.suffix || ''))), helpEl);
       }
       case 'select': {
         const sel = h('select.sf-input.sf-select', { on: { change: e => set(spec.numeric ? +e.target.value : e.target.value) } },
@@ -88,10 +90,11 @@
         spec.items.forEach(it => {
           const btn = h('button.sf-key-btn', { type: 'button' }, keyName(map[it.id]));
           btn.addEventListener('click', () => {
+            FB.stopKeyCapture();
             btn.classList.add('listening'); btn.textContent = '…';
             const handler = (e) => {
               e.preventDefault(); e.stopPropagation();
-              window.removeEventListener('keydown', handler, true);
+              FB.stopKeyCapture();
               btn.classList.remove('listening');
               if (e.key !== 'Escape' && e.key !== ' ' && e.key.length === 1 || /^(Arrow|Enter$)/.test(e.key)) {
                 const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
@@ -102,6 +105,7 @@
               } else btn.textContent = keyName(map[it.id]);
             };
             window.addEventListener('keydown', handler, true);
+            FB.keyCapture = { handler, reset: () => { btn.classList.remove('listening'); btn.textContent = keyName(map[it.id]); } };
           });
           grid.append(h('div', it.label), btn);
         });
@@ -136,6 +140,12 @@
     }
     return h('div');
   };
+  FB.stopKeyCapture = function () {
+    if (!FB.keyCapture) return;
+    window.removeEventListener('keydown', FB.keyCapture.handler, true);
+    FB.keyCapture.reset();
+    FB.keyCapture = null;
+  };
   function keyName(k) {
     if (!k) return '—';
     if (k === 'Enter') return '⏎';
@@ -155,11 +165,12 @@
   FB.levelRuleDefaults = { levelUp: 80, levelDown: 50, downAfter: 3, autoLevel: true };
 
   // ---------- Modal ----------
+  FB.openModals = new Set();
   FB.modal = function ({ title, tabs, body, foot, classic, onClose, width }) {
     const back = h('div.modal-backdrop');
     const m = h('div.modal' + (classic ? '.classic' : ''));
     if (width) m.style.width = width + 'px';
-    const close = () => { back.remove(); FB.modalOpen = Math.max(0, (FB.modalOpen || 1) - 1); document.removeEventListener('keydown', esc, true); onClose && onClose(); };
+    const close = () => { FB.stopKeyCapture(); FB.openModals.delete(m); back.remove(); FB.modalOpen = Math.max(0, (FB.modalOpen || 1) - 1); document.removeEventListener('keydown', esc, true); onClose && onClose(); };
     const esc = (e) => { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); close(); } };
     document.addEventListener('keydown', esc, true);
     back.addEventListener('mousedown', e => { if (e.target === back) close(); });
@@ -175,7 +186,15 @@
       };
       tabs.forEach((t, i) => tabBar.append(h('button.modal-tab', { type: 'button', on: { click: () => show(i) } }, t.title)));
       m.append(tabBar);
-      m.rerender = () => { const st = bodyEl.scrollTop; show(active); bodyEl.scrollTop = st; };
+      // re-draw after a change without losing the scroll position or keyboard focus
+      m.rerender = () => {
+        const st = bodyEl.scrollTop;
+        const focusables = () => FB.$$('input, select, button', bodyEl);
+        const fi = focusables().indexOf(document.activeElement);
+        show(active);
+        bodyEl.scrollTop = st;
+        if (fi >= 0 && focusables()[fi]) focusables()[fi].focus({ preventScroll: true });
+      };
       show(0);
     } else if (body) bodyEl.append(body);
     m.append(bodyEl);
@@ -184,6 +203,7 @@
     document.body.append(back);
     FB.modalOpen = (FB.modalOpen || 0) + 1;
     m.close = close;
+    FB.openModals.add(m);
     return m;
   };
 
@@ -198,7 +218,9 @@
       h('div.head-right', h('a', { href: '#/progress' }, 'Progress'), h('a.accent', { href: '#/dashboard' }, 'Train')));
     const menu = h('nav.main-menu#mainMenu');
     const content = h('main.main-content#view');
-    app.append(head, h('div.app-body', menu, content));
+    const scrim = h('div.menu-scrim', { on: { click: () => document.body.classList.remove('menu-open') } });
+    menu.addEventListener('click', e => { if (e.target.closest('a')) document.body.classList.remove('menu-open'); });
+    app.append(head, h('div.app-body', menu, scrim, content));
   };
 
   FB.renderMenu = function (route) {
@@ -226,10 +248,15 @@
   FB.parseRoute = function () {
     const parts = (location.hash || '#/dashboard').replace(/^#\/?/, '').split('/').filter(Boolean);
     if (!parts.length) return { page: 'dashboard' };
-    if (FB.games.byId[parts[0]]) return { page: 'game', game: parts[0], sub: parts[1] || 'training' };
-    return { page: parts[0] };
+    const g = FB.games.byId[parts[0]];
+    if (g) {
+      const sub = g.pages.some(p => p[0] === parts[1]) ? parts[1] : 'training';
+      return { page: 'game', game: parts[0], sub };
+    }
+    return { page: FB.pages[parts[0]] && parts[0] !== 'gameDoc' ? parts[0] : 'dashboard' };
   };
   FB.navigate = function () {
+    FB.openModals.forEach(m => m.close());
     if (FB.currentPage && FB.currentPage.destroy) FB.currentPage.destroy();
     FB.currentPage = null;
     document.body.classList.remove('in-game', 'menu-open');
@@ -242,9 +269,11 @@
     if (route.page === 'game') {
       const g = FB.games.byId[route.game];
       if (route.sub === 'training') { FB.currentPage = new FB.ExercisePage(g, view); title = g.name + ' · FastBrain'; }
-      else { FB.pages.gameDoc(g, route.sub, view); title = g.name + ' · ' + route.sub.replace(/-/g, ' '); }
-    } else if (FB.pages[route.page]) FB.pages[route.page](view);
-    else FB.pages.dashboard(view);
+      else { FB.pages.gameDoc(g, route.sub, view); title = g.name + ' · ' + g.pages.find(p => p[0] === route.sub)[1]; }
+    } else {
+      FB.pages[route.page](view);
+      title = { progress: 'Progress', about: 'About' }[route.page] ? { progress: 'Progress', about: 'About' }[route.page] + ' · FastBrain' : 'FastBrain';
+    }
     document.title = title;
   };
 
@@ -355,7 +384,7 @@
       const list = h('div.today-sets');
       if (!today.length) list.append(h('div.empty', 'No sets yet today.'));
       today.forEach((ss, i) => {
-        const cls = ss.score >= (ss.up || 80) ? 'good' : ss.score < (ss.down || 50) ? 'bad' : 'mid';
+        const cls = ss.score >= (ss.up ?? 80) ? 'good' : ss.score < (ss.down ?? 50) ? 'bad' : 'mid';
         list.append(h('div.ts-row.' + cls, h('span', (i + 1) + '.'), h('span', ss.label), h('span', ss.score + '%'),
           h('span', ss.extra != null ? ss.extra : ''), h('span', FB.fmtDur(ss.dur))));
       });
@@ -506,6 +535,7 @@
       let lvlMsg = null;
       if (change > 0) lvlMsg = h('div.rc-level.up', '▲ Level up! Next set: ' + (g.levelWord || 'level') + ' ' + levelLabel(newLevel));
       else if (change < 0) lvlMsg = h('div.rc-level.down', '▼ Level down. Next set: ' + (g.levelWord || 'level') + ' ' + levelLabel(newLevel));
+      else if (bad && se.autoLevel !== false && idx === 0) lvlMsg = h('div.rc-level.down', 'You are on the lowest level — keep practising');
       else if (bad && se.autoLevel !== false) lvlMsg = h('div.rc-level.down', 'Weak set ' + st.weak + ' of ' + se.downAfter + ' before the level drops');
       else lvlMsg = h('div.rc-level', 'Next set: ' + (g.levelWord || 'level') + ' ' + levelLabel(newLevel));
       this.areaEl.innerHTML = '';
@@ -564,11 +594,21 @@
   // Keep the screen on while a set runs (phones dim after ~30 s otherwise)
   FB.wake = {
     lock: null,
+    wanted: false,
     async on() {
-      try { if ('wakeLock' in navigator && !this.lock) { this.lock = await navigator.wakeLock.request('screen'); this.lock.addEventListener('release', () => { this.lock = null; }); } } catch (e) { /* not allowed here */ }
+      this.wanted = true;
+      if (!('wakeLock' in navigator) || this.lock) return;
+      try {
+        const lock = await navigator.wakeLock.request('screen');
+        if (!this.wanted) { lock.release().catch(() => {}); return; }
+        this.lock = lock;
+        lock.addEventListener('release', () => { if (this.lock === lock) this.lock = null; });
+      } catch (e) { /* not allowed here */ }
     },
-    off() { if (this.lock) { this.lock.release().catch(() => {}); this.lock = null; } }
+    off() { this.wanted = false; if (this.lock) { this.lock.release().catch(() => {}); this.lock = null; } }
   };
+  // the browser drops the lock when the app is hidden; take it back when you return mid-set
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && FB.wake.wanted && !FB.wake.lock) FB.wake.on(); });
 
   // standard speed control used by several exercises
   FB.speedSeg = (opts) => ({ type: 'seg', key: 'speed', label: 'Speed', options: opts });

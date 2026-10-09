@@ -139,7 +139,12 @@
     },
 
     mount(area, ctx) {
-      let grid, cells, buttons, responses, feedbackTimer;
+      let grid, cells, buttons, feedbackTimer, fallbackEl;
+      // Press tracking. Each signal has its own response window: a synced signal's
+      // window is its step; an async signal appears half a step late, so its window
+      // runs from that onset to the next async onset. A press is credited to the
+      // trial whose window is open for that signal.
+      let pressed = null, stepIdx = -1, stepStart = 0, stepLen = 0, asyncOf = () => false;
       const activeMods = () => MOD_ORDER.filter(m => ctx.state.mods.includes(m));
       const buttonMods = () => activeMods().slice().sort((a, b) => keyCol(ctx.settings.keys[a]) - keyCol(ctx.settings.keys[b]));
 
@@ -156,13 +161,17 @@
             (k ? FB.keyName(k) + ': ' : '') + MODS[m].label);
           buttons[m] = b; bar.append(b);
         });
-        area.append(grid, bar);
+        fallbackEl = h('div.nback-fallback');
+        area.append(grid, fallbackEl, bar);
       }
 
       function respond(m) {
-        if (!ctx.running || !responses || responses[m]) return;
-        responses[m] = true;
-        if (ctx.settings.showPresses) buttons[m].classList.add('pressed');
+        if (!ctx.running || !pressed || !pressed[m] || stepIdx < 0) return;
+        let j = stepIdx;
+        if (asyncOf(m) && performance.now() - stepStart < stepLen / 2) j = stepIdx - 1;
+        if (j < 0 || pressed[m].has(j)) return;
+        pressed[m].add(j);
+        if (ctx.settings.showPresses && buttons[m]) buttons[m].classList.add('pressed');
       }
 
       function clearMarker() { cells.forEach(c => { c.innerHTML = ''; }); }
@@ -180,9 +189,14 @@
         cells[cellIdx].append(mk);
       }
 
-      function speak(val) {
+      function speak(val, clock, ms) {
         const word = ctx.settings.sounds === 'colors' ? COLOR_WORDS[val] : LETTERS[val];
-        FB.speech.say(word, ctx.volume());
+        if (FB.speech.supported) FB.speech.say(word, ctx.volume());
+        else {
+          // no speech voice in this browser: show the "sound" as text instead of going silent
+          fallbackEl.textContent = word.toUpperCase();
+          clock.after(ms, () => { fallbackEl.textContent = ''; });
+        }
       }
 
       // Exactly round(scorable × rate) matches per signal, like BrainScale's
@@ -205,7 +219,7 @@
 
       return {
         idle() { draw(false); },
-        cancel() { clearTimeout(feedbackTimer); },
+        cancel() { clearTimeout(feedbackTimer); pressed = null; stepIdx = -1; },
         key(e) {
           if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
           const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
@@ -221,14 +235,39 @@
           const tally = {};
           mods.forEach(m => { tally[m] = { tp: 0, fp: 0, fn: 0, tn: 0 }; });
           const isAsync = m => !!(ctx.state.async && ctx.state.async[m]);
+          // only Position and Audio can be async; colour/shape/number travel with the square
+          asyncOf = m => (m === 'audio' ? isAsync('audio') : isAsync('position'));
+          pressed = {};
+          mods.forEach(m => { pressed[m] = new Set(); });
+          stepLen = step;
+
+          const fb = {};
+          const scoreTrial = (m, j) => {
+            const hit = pressed[m].has(j);
+            if (j < n) { if (hit) { tally[m].fp++; fb[m] = 'wrong'; } return; }
+            const match = seqs[m][j] === seqs[m][j - n];
+            if (match && hit) { tally[m].tp++; fb[m] = 'right'; }
+            else if (match) { tally[m].fn++; fb[m] = 'wrong'; }
+            else if (hit) { tally[m].fp++; fb[m] = 'wrong'; }
+            else tally[m].tn++;
+          };
+          const showFeedback = (ms) => {
+            if (!s.showMistakes) return;
+            Object.entries(fb).forEach(([m, c]) => buttons[m] && buttons[m].classList.add(c));
+            clearTimeout(feedbackTimer);
+            feedbackTimer = setTimeout(() => Object.values(buttons).forEach(b => b.classList.remove('right', 'wrong')), Math.min(700, ms));
+          };
+          const clearPressed = (asyncPhase) => mods.forEach(m => { if (asyncOf(m) === asyncPhase && buttons[m]) buttons[m].classList.remove('pressed'); });
 
           await clock.wait(600);
           for (let i = 0; i < total; i++) {
             ctx.setCounter(s.showCounter ? (i + 1) + ' of ' + total : '');
-            responses = {};
+            stepIdx = i; stepStart = performance.now();
+            clearPressed(false);
             if (s.distract) grid.style.backgroundColor = `hsl(${FB.rand(360)}, ${FB.randInt(20, 55)}%, ${FB.randInt(22, 34)}%)`;
             const visual = mods.filter(m => m !== 'audio');
             const present = (asyncPhase) => {
+              if (asyncPhase) clearPressed(true);
               const visNow = visual.length && (isAsync('position') === asyncPhase);
               if (visNow) {
                 const vals = {};
@@ -236,31 +275,30 @@
                 showMarker(mods.includes('position') ? seqs.position[i] : 4, vals);
                 clock.after(stim, clearMarker);
               }
-              if (mods.includes('audio') && isAsync('audio') === asyncPhase) speak(seqs.audio[i]);
+              if (mods.includes('audio') && isAsync('audio') === asyncPhase) speak(seqs.audio[i], clock, stim);
             };
             present(false);
-            if (mods.some(isAsync)) clock.after(Math.round(step / 2), () => present(true));
-            await clock.wait(step);
-
-            // score this step
-            const fb = {};
-            mods.forEach(m => {
-              if (i < n) { if (responses[m]) { tally[m].fp++; fb[m] = 'wrong'; } return; }
-              const match = seqs[m][i] === seqs[m][i - n];
-              const pressed = !!responses[m];
-              if (match && pressed) { tally[m].tp++; fb[m] = 'right'; }
-              else if (match) { tally[m].fn++; fb[m] = 'wrong'; }
-              else if (pressed) { tally[m].fp++; fb[m] = 'wrong'; }
-              else tally[m].tn++;
-            });
-            Object.values(buttons).forEach(b => b.classList.remove('pressed', 'right', 'wrong'));
-            if (s.showMistakes) {
-              Object.entries(fb).forEach(([m, c]) => buttons[m] && buttons[m].classList.add(c));
-              clearTimeout(feedbackTimer);
-              feedbackTimer = setTimeout(() => Object.values(buttons).forEach(b => b.classList.remove('right', 'wrong')), Math.min(700, step * 0.4));
+            if (mods.some(asyncOf)) {
+              clock.after(Math.round(step / 2), () => {
+                // the previous async trial's window closes as the next one opens
+                Object.keys(fb).forEach(k => delete fb[k]);
+                if (i > 0) mods.filter(asyncOf).forEach(m => scoreTrial(m, i - 1));
+                showFeedback(step * 0.4);
+                present(true);
+              });
             }
+            await clock.wait(step);
+            Object.keys(fb).forEach(k => delete fb[k]);
+            mods.filter(m => !asyncOf(m)).forEach(m => scoreTrial(m, i));
+            showFeedback(step * 0.4);
           }
-          responses = null;
+          // last async trial: its window runs half a step past the final step
+          if (mods.some(asyncOf)) {
+            await clock.wait(Math.round(step / 2));
+            mods.filter(asyncOf).forEach(m => scoreTrial(m, total - 1));
+          }
+          pressed = null; stepIdx = -1;
+          Object.values(buttons).forEach(b => b.classList.remove('pressed'));
           grid.style.backgroundColor = '';
 
           // BrainScale scoring: per signal, Total = number of matches,
@@ -342,7 +380,10 @@
         <tr><td>5</td><td>top-left</td><td>T</td><td><kbd>A</kbd> + <kbd>L</kbd></td></tr>
       </table>
       <h3>Scoring and levels</h3>
-      <p>Each signal is scored as hits ÷ (hits + misses + false alarms). Score 80% or more and N goes up by one.
+      <p>Each set has a fixed number of matches per signal (25% of the steps that can match). For each signal,
+      <b>Total</b> = its number of matches, <b>Errors</b> = matches you missed + presses when there was no match, and
+      <b>Rate</b> = (Total − Errors) ÷ Total — so pressing too often can push it below zero. The set's Success Rate
+      combines all signals the same way and never drops below 0%. Score 80% or more and N goes up by one.
       Score under 50% three sets in a row and N goes down. You can change these limits under <b>All settings</b>.</p>
       <h3>More signals</h3>
       <p>Click the <b>Type</b> link in the header to train Single (one signal), Triple, Quad or Penta N-Back by adding

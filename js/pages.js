@@ -67,7 +67,6 @@
     const svg = document.createElementNS(svgNS, 'svg');
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     svg.setAttribute('class', 'chart');
-    svg.setAttribute('preserveAspectRatio', 'none');
     const add = (tag, attrs, text) => { const e = document.createElementNS(svgNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; svg.appendChild(e); return e; };
     const iw = W - P.l - P.r, ih = H - P.t - P.b;
     [0, 50, 100].forEach(v => {
@@ -144,7 +143,7 @@
     body.append(h('div.section-title', { style: { marginTop: '28px' } }, 'Recent sets'));
     if (!all.length) body.append(h('p.empty-note', 'Nothing here yet — finish a set and it will show up.'));
     else {
-      const t = h('table.history-table', h('tr', ['Date', 'Exercise', 'Set', 'Score', 'Level after', 'Time'].map(x => h('th', x))));
+      const t = h('table.history-table', h('tr', ['Date', 'Exercise', 'Set', 'Score', 'Level after', 'Time'].map((x, i) => h('th' + (i === 2 ? '.col-set' : ''), x))));
       all.slice(-40).reverse().forEach(s => {
         const g = FB.games.byId[s.game];
         const lv = g ? g.levels({ settings: {}, state: {} }) : [];
@@ -152,10 +151,10 @@
         const levelAfter = g ? (lv[at(s.newLevel)] || {}).label : s.newLevel;
         const move = at(s.newLevel) - at(s.level);
         t.append(h('tr',
-          h('td', FB.dayKey(s.ts) + ' ' + FB.fmtTime(s.ts)),
-          h('td', g ? g.name : s.game),
-          h('td', s.label || ''),
-          h('td', { style: { color: s.score >= (s.up || 80) ? '#14c2bd' : s.score < (s.down || 50) ? '#ff6b5b' : '' } }, s.score + '%'),
+          h('td', FB.dayKey(s.ts).slice(5) + ' ' + FB.fmtTime(s.ts)),
+          h('td', g ? (g.menuName || g.name).replace('Corsi Block Tapping', 'Corsi') : s.game),
+          h('td.col-set', s.label || ''),
+          h('td', { style: { color: s.score >= (s.up ?? 80) ? '#14c2bd' : s.score < (s.down ?? 50) ? '#ff6b5b' : '' } }, s.score + '%'),
           h('td', (levelAfter || '') + (move > 0 ? ' ▲' : move < 0 ? ' ▼' : '')),
           h('td', FB.fmtDur(s.dur))));
       });

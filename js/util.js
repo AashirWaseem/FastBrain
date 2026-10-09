@@ -21,7 +21,8 @@ window.FB = window.FB || {};
     }
     if (attrs) {
       for (const [k, v] of Object.entries(attrs)) {
-        if (v == null || v === false) continue;
+        if (v == null) continue;
+        if (v === false) { if (k in el && k !== 'on') { try { el[k] = false; } catch (e) { /* ignore */ } } continue; }
         if (k === 'on') for (const [ev, fn] of Object.entries(v)) el.addEventListener(ev, fn);
         else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
         else if (k === 'html') el.innerHTML = v;
@@ -118,6 +119,7 @@ window.FB = window.FB || {};
   // One-time upgrade: speech volume used to default to 40, which was too quiet.
   // Second upgrade: defaults re-measured against BrainScale (N-Back 25% matches,
   // Memory Span 50/50 timing, no per-round feedback in Span / Corsi, CWM item time).
+  const MIGRATION_FLAGS = ['brainscaleV2', 'nbackQuiet', 'nbackPressOn', 'loudSpeech'];
   function migrate(d) {
     if (!d.global.brainscaleV2) {
       const set = (id, key, from, to) => { const s = d.settings[id]; if (s && s[key] === from) s[key] = to; };
@@ -180,9 +182,14 @@ window.FB = window.FB || {};
       const d = JSON.parse(text);
       if (!d || typeof d !== 'object' || !Array.isArray(d.sessions)) throw new Error('Not a FastBrain backup file');
       d.settings = d.settings || {}; d.state = d.state || {}; d.global = d.global || {};
-      this.data = d; this.save();
+      this.data = migrate(d); this.save();
     },
-    wipe() { this.data = { version: 1, settings: {}, state: {}, sessions: [], global: {} }; this.save(); }
+    wipe() {
+      const flags = {};
+      for (const k of MIGRATION_FLAGS) if (this.data.global[k]) flags[k] = true;
+      this.data = { version: 1, settings: {}, state: {}, sessions: [], global: flags };
+      this.save();
+    }
   };
 
   // ---------- Cancellable run clock ----------
