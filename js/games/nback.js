@@ -55,7 +55,7 @@
       speed: 'normal', stepMs: 3000, slowerAtHigher: false, perLevelMs: 150,
       setLength: 'standard', base: 20, factor: 1, exponent: 2,
       matchRate: 25, stimMs: 500, distract: false,
-      volume: 100, sounds: 'letters', showMistakes: false, showPresses: false, showCounter: true,
+      volume: 100, sounds: 'letters', showMistakes: false, showPresses: true, showCounter: true,
       keys: { position: 'a', audio: 'l', color: 'f', shape: 'j', number: 'k' },
       colors: ['#d13b3b', '#2f9e44', '#1c7ed6', '#f2c200', '#9c36b5', '#f76707', '#e8e8e8', '#0ca678']
     },
@@ -105,7 +105,7 @@
       {
         title: 'Look', fields: [
           { type: 'toggle', key: 'showMistakes', label: 'Show my mistakes', help: 'Off (default): no feedback during the set, only the results at the end. On: after each step a button turns green if you were right, red if not.' },
-          { type: 'toggle', key: 'showPresses', label: 'Highlight the button I press', help: 'Off (default): pressing a key or button gives no visual sign during the set.' },
+          { type: 'toggle', key: 'showPresses', label: 'Highlight the button I press', help: 'On (default): a button lights up when you press it, until the next step. It never shows whether you were right.' },
           { type: 'toggle', key: 'showCounter', label: 'Show trial counter' },
           { type: 'colors', key: 'colors', label: 'Colors', help: 'Used by the Color modality. Change them if two look alike to you.' }
         ]

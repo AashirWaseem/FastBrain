@@ -134,6 +134,11 @@ window.FB = window.FB || {};
       if (s) { s.showMistakes = false; s.showPresses = false; }
       d.global.nbackQuiet = true;
     }
+    if (!d.global.nbackPressOn) {
+      const s = d.settings['dual-n-back'];
+      if (s) s.showPresses = true;
+      d.global.nbackPressOn = true;
+    }
     if (!d.global.loudSpeech) {
       for (const id of ['dual-n-back', 'pasat']) {
         const s = d.settings[id];
