@@ -1,6 +1,6 @@
 /* Service worker: keeps a copy of the app on the device so it opens and runs with no internet.
    Bump VERSION whenever app files change so phones pick up the update. */
-const VERSION = 'fastbrain-v4';
+const VERSION = 'fastbrain-v5';
 const FILES = [
   './', './index.html', './manifest.json', './css/app.css',
   './js/util.js', './js/ui.js', './js/pages.js', './js/data/words.js',

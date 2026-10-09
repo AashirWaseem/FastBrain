@@ -537,7 +537,7 @@ body:not(.in-game) .game-main { flex: 1 1 auto; max-width: none; }
 @media (max-width: 600px), (pointer: coarse) {
   /* big thumb targets for the N-Back match buttons */
   .nback-buttons { gap: 8px; margin-top: 12px; }
-  .nback-button { padding: 22px 4px; font-size: 17px; border-radius: 8px; touch-action: manipulation; }
+  .nback-button { padding: 22px 4px; font-size: 17px; border-radius: 8px; }
   .cwm-yesno .btn { min-width: 110px; padding: 12px 14px; font-size: 16px; }
   .cwm-grid4.recall div, .cwm-grid4.letters div { font-size: 19px; }
   .btn-mmath-next { height: 46px; }
@@ -554,3 +554,9 @@ body:not(.in-game) .game-main { flex: 1 1 auto; max-width: none; }
 /* no text selection / callout menus when tapping fast during a set */
 body.in-game { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 body.in-game input { -webkit-user-select: text; user-select: text; }
+
+/* N-Back answer buttons: every finger is a press. "none" stops the browser from
+   reading two simultaneous taps (Position + Audio) as a pinch-zoom and dropping one. */
+.nback-buttons, .nback-button, .nback-grid { touch-action: none; }
+.nback-button { -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
+.nback-button:focus { outline: none; }
